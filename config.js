@@ -1,6 +1,6 @@
-// Συμπληρώνεται αυτόματα με τα στοιχεία του Supabase project «oikogeneia-symvoulos».
+// Στοιχεία Supabase project «oikogeneia-symvoulos».
 // Το publishable key είναι δημόσιο από σχεδιασμό. Την πρόσβαση την κλειδώνουν οι κανόνες RLS της βάσης.
 window.CFG = {
-  url: 'https://YOUR-PROJECT.supabase.co',
-  key: 'YOUR-PUBLISHABLE-KEY'
+  url: 'https://wgwqztzmnqglikyowmfa.supabase.co',
+  key: 'sb_publishable_cVzrvjqoy1Acq_9pTaXqjA_wCoAGjvu'
 };

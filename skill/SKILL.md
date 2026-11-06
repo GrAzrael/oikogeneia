@@ -11,7 +11,7 @@ description: Use when George asks anything about his family's health, lab result
 
 ## Σύνδεση
 - Connector: **Supabase** (εργαλεία `mcp__Supabase__*`, φόρτωσέ τα με ToolSearch «Supabase»).
-- Project: **oikogeneia-symvoulos** · project_id: `__PROJECT_ID__` (αν άλλαξε, βρες το με `list_projects`).
+- Project: **oikogeneia-symvoulos** · project_id: `wgwqztzmnqglikyowmfa` (αν άλλαξε, βρες το με `list_projects`).
 - Όλα μέσω `execute_sql`. Μην αλλάζεις το σχήμα (DDL) χωρίς να το ζητήσει ο George.
 - Το `owner_id` συμπληρώνεται αυτόματα από trigger, οπότε **μην το βάζεις** στα INSERT.
 - Πρώτα πάντα: `select id, name, relation, birth_date, allergies, chronic_conditions, diet_notes from members;` για να ξέρεις ποιος είναι ποιος.
