@@ -5,6 +5,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const sb = window.supabase.createClient(window.CFG.url, window.CFG.key);
 const BUCKET = 'health-docs';
+const APP_VERSION = '5';
 const S = { user: null, members: [], mid: localStorage.getItem('mid'), charts: [], seg: {} };
 
 /* ---------- σταθερές ---------- */
@@ -720,7 +721,8 @@ async function settings(v) {
       <ul style="margin:8px 0 0;padding-left:20px;color:var(--muted)"><li>«Πέρασε τις νέες εξετάσεις»</li><li>«Ανάλυσε τα σημερινά γεύματα»</li>
       <li>«Πώς πάει η χοληστερίνη μου;»</li><li>«Φτιάξε λίστα για την εβδομάδα»</li><li>«Βρες φθηνότερα τα προϊόντα της λίστας»</li><li>«Εβδομαδιαία αναφορά»</li></ul></div>
     <p class="hint">Η εφαρμογή κρατά πληροφορίες και βοηθά στην οργάνωση. Δεν αντικαθιστά τον γιατρό. Για αλλαγές σε φάρμακα ή δόσεις, μίλα πάντα πρώτα με τον γιατρό σου.</p>
-    <button class="btn danger wide" id="lo" style="margin-top:12px">Αποσύνδεση</button>`;
+    <button class="btn danger wide" id="lo" style="margin-top:12px">Αποσύνδεση</button>
+    <p class="hint" style="text-align:center">Έκδοση ${APP_VERSION}</p>`;
   $$('[data-me]').forEach(c => c.onclick = () => editMember(member(c.dataset.me)));
   $('#am').onclick = () => editMember();
   $('#lo').onclick = async () => { await sb.auth.signOut(); };
@@ -739,4 +741,10 @@ async function start(session) {
 window.addEventListener('hashchange', () => S.user && route());
 sb.auth.onAuthStateChange((_e, session) => start(session));
 sb.auth.getSession().then(({ data }) => start(data.session));
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded && navigator.serviceWorker.controller) { reloaded = true; location.reload(); } });
+}
+// έλεγχος για νέα έκδοση κάθε φορά που η εφαρμογή ξαναγίνεται ορατή
+document.addEventListener('visibilitychange', () => { if (!document.hidden) navigator.serviceWorker?.getRegistration().then(r => r?.update()); });
