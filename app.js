@@ -119,7 +119,7 @@ function showLogin(mode = 'in') {
     e.preventDefault(); const f = new FormData(e.target);
     try {
       if (mode === 'up') {
-        const { data } = await sb.auth.signUp({ email: f.get('email'), password: f.get('pw') }).then(r => { if (r.error) throw r.error; return r; });
+        const { data } = await sb.auth.signUp({ email: f.get('email'), password: f.get('pw'), options: { emailRedirectTo: location.origin + location.pathname } }).then(r => { if (r.error) throw r.error; return r; });
         if (!data.session) { toast('Στάλθηκε email επιβεβαίωσης. Άνοιξέ το και μετά κάνε είσοδο.'); showLogin('in'); }
       } else {
         const r = await sb.auth.signInWithPassword({ email: f.get('email'), password: f.get('pw') });
@@ -659,6 +659,7 @@ async function start(session) {
   if (!session) { S.user = null; return showLogin(); }
   if (S.user?.id === session.user.id) return;
   S.user = session.user;
+  if (/access_token|error_description/.test(location.hash)) history.replaceState(null, '', location.pathname + '#/');
   $('.top').classList.remove('hide'); $('#tabs').classList.remove('hide');
   try { await loadMembers(); } catch (e) { return fail(e); }
   route();
