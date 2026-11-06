@@ -146,6 +146,56 @@ function renderMemberBar() {
     S.mid = v; localStorage.setItem('mid', v); renderMemberBar(); route();
   });
 }
+/* λίστες επιλογών για μέλη */
+const CONDITIONS = {
+  child: ['Άσθμα', 'Αλλεργική ρινίτιδα', 'Ατοπική δερματίτιδα (έκζεμα)', 'Τροφική αλλεργία', 'Υποτροπιάζουσες ωτίτιδες', 'Συχνές αμυγδαλίτιδες',
+    'Σιδηροπενική αναιμία', 'Δυσκοιλιότητα', 'Γαστροοισοφαγική παλινδρόμηση', 'Αυξημένο βάρος', 'Κοιλιοκάκη', 'ΔΕΠΥ', 'Διαβήτης τύπου 1', 'Πυρετικοί σπασμοί'],
+  teen: ['Άσθμα', 'Αλλεργική ρινίτιδα', 'Ακμή', 'Ημικρανίες', 'Σιδηροπενική αναιμία', 'Άγχος', 'ΔΕΠΥ', 'Αυξημένο βάρος', 'Σκολίωση',
+    'Κοιλιοκάκη', 'Διαβήτης τύπου 1', 'Επώδυνη περίοδος'],
+  adult: ['Αλλεργική ρινίτιδα', 'Άσθμα', 'Ημικρανίες', 'Άγχος', 'Κατάθλιψη', 'Υποθυρεοειδισμός / Hashimoto', 'Σιδηροπενική αναιμία',
+    'Ευερέθιστο έντερο', 'Γαστρίτιδα / παλινδρόμηση', 'Οσφυαλγία / αυχενικό', 'Υψηλή χοληστερίνη', 'Αυξημένο βάρος', 'Λιπώδες ήπαρ',
+    'Ανεπάρκεια βιταμίνης D', 'Πολυκυστικές ωοθήκες', 'Ενδομητρίωση'],
+  middle: ['Υπέρταση', 'Υψηλή χοληστερίνη', 'Υψηλά τριγλυκερίδια', 'Προδιαβήτης / αντίσταση στην ινσουλίνη', 'Διαβήτης τύπου 2', 'Λιπώδες ήπαρ',
+    'Αυξημένο ουρικό οξύ / ουρική αρθρίτιδα', 'Υποθυρεοειδισμός / Hashimoto', 'Αυξημένο βάρος', 'Γαστρίτιδα / παλινδρόμηση',
+    'Οσφυαλγία / αυχενικό', 'Άπνοια ύπνου', 'Ανεπάρκεια βιταμίνης D', 'Άγχος', 'Κατάθλιψη', 'Καλοήθης υπερπλασία προστάτη',
+    'Εμμηνόπαυση', 'Οστεοπενία'],
+  senior: ['Υπέρταση', 'Διαβήτης τύπου 2', 'Υψηλή χοληστερίνη', 'Στεφανιαία νόσος', 'Κολπική μαρμαρυγή', 'Καρδιακή ανεπάρκεια',
+    'Χρόνια νεφρική νόσος', 'Οστεοπόρωση', 'Οστεοαρθρίτιδα', 'ΧΑΠ', 'Υποθυρεοειδισμός', 'Ανεπάρκεια βιταμίνης B12', 'Καταρράκτης',
+    'Γλαύκωμα', 'Βαρηκοΐα', 'Διαταραχή μνήμης', 'Καλοήθης υπερπλασία προστάτη', 'Δυσκοιλιότητα']
+};
+const ONLY_SEX = { 'Πολυκυστικές ωοθήκες': 'Θ', 'Ενδομητρίωση': 'Θ', 'Εμμηνόπαυση': 'Θ', 'Οστεοπενία': 'Θ', 'Επώδυνη περίοδος': 'Θ', 'Καλοήθης υπερπλασία προστάτη': 'Α' };
+const DIETS = ['Μεσογειακή', 'Χωρίς περιορισμούς', 'Χορτοφαγική', 'Vegan', 'Νηστεία (Ορθόδοξη)', 'Χαμηλή σε αλάτι', 'Χαμηλή σε ζάχαρη',
+  'Χαμηλή σε κορεσμένα λιπαρά', 'Χαμηλή σε πουρίνες', 'Χαμηλή σε υδατάνθρακες', 'Υψηλή σε φυτικές ίνες', 'Υψηλή σε πρωτεΐνη',
+  'Χωρίς γλουτένη', 'Χωρίς λακτόζη', 'Χωρίς χοιρινό', 'Δεν τρώει ψάρι', 'Δεν τρώει όσπρια', 'Δεν τρώει λαχανικά', 'Αποφεύγει τα πικάντικα'];
+const DIETS_CHILD = ['Επιλεκτικός στο φαγητό', 'Λίγα γλυκά', 'Χωρίς αναψυκτικά', 'Ακόμα με γάλα σε μπιμπερό'];
+function ageGroup(bd) {
+  const a = age(bd);
+  if (a === '') return null;
+  return a < 13 ? 'child' : a < 18 ? 'teen' : a < 40 ? 'adult' : a < 65 ? 'middle' : 'senior';
+}
+const splitList = v => (v || '').split(/\s*[,;\n]\s*/).map(x => x.trim()).filter(Boolean);
+/* επιλογή από λίστα: κουμπιά-ετικέτες + πεδίο «Άλλο»· γράφει στο κρυφό input name=… ως «α, β, γ» */
+function picker(f, name, getOptions, initial) {
+  const box = $(`[data-pick="${name}"]`, f), hidden = $(`input[name="${name}"]`, f), extra = $(`[data-extra="${name}"]`, f);
+  const sel = new Set(splitList(initial));
+  const sync = () => { hidden.value = [...sel, ...splitList(extra.value).filter(x => !sel.has(x))].join(', '); };
+  const draw = () => {
+    const opts = getOptions();
+    // ό,τι έχει ήδη επιλεγεί και δεν υπάρχει στη λίστα μένει στο «Άλλο»
+    const known = new Set(opts);
+    const others = [...sel].filter(x => !known.has(x));
+    others.forEach(x => sel.delete(x));
+    extra.value = [...new Set([...splitList(extra.value), ...others])].join(', ');
+    box.innerHTML = opts.map(o => `<button type="button" class="opt" aria-pressed="${sel.has(o)}">${esc(o)}</button>`).join('');
+    $$('.opt', box).forEach(b => b.onclick = () => {
+      const o = b.textContent; sel.has(o) ? sel.delete(o) : sel.add(o); b.setAttribute('aria-pressed', sel.has(o)); sync();
+    });
+    sync();
+  };
+  extra.oninput = sync;
+  draw();
+  return draw;
+}
 function editMember(m = {}) {
   sheet(m.id ? 'Επεξεργασία μέλους' : 'Νέο μέλος', `
     <label>Όνομα</label><input name="name" required value="${esc(m.name)}">
@@ -153,9 +203,14 @@ function editMember(m = {}) {
     <div><label>Φύλο</label><select name="sex"><option value=""></option>${['Α', 'Θ'].map(s => `<option ${s === m.sex ? 'selected' : ''}>${s}</option>`).join('')}</select></div></div>
     <div class="two"><div><label>Ημ. γέννησης</label><input type="date" name="birth_date" value="${esc(m.birth_date)}"></div>
     <div><label>Ύψος (cm)</label><input name="height_cm" inputmode="decimal" value="${esc(m.height_cm)}"></div></div>
-    <label>Αλλεργίες</label><input name="allergies" value="${esc(m.allergies)}">
-    <label>Χρόνια θέματα υγείας</label><textarea name="chronic_conditions">${esc(m.chronic_conditions)}</textarea>
-    <label>Διατροφικές προτιμήσεις / περιορισμοί</label><textarea name="diet_notes">${esc(m.diet_notes)}</textarea>
+    <label>Αλλεργίες</label><input name="allergies" value="${esc(m.allergies)}" placeholder="π.χ. πενικιλίνη, γύρη, ξηροί καρποί">
+    <label>Χρόνια θέματα υγείας</label>
+    <p class="hint" data-agehint style="margin-top:0"></p>
+    <input type="hidden" name="chronic_conditions"><div class="opts" data-pick="chronic_conditions"></div>
+    <input data-extra="chronic_conditions" placeholder="Άλλο (χωρισμένα με κόμμα)">
+    <label>Διατροφικές προτιμήσεις / περιορισμοί</label>
+    <input type="hidden" name="diet_notes"><div class="opts" data-pick="diet_notes"></div>
+    <input data-extra="diet_notes" placeholder="Άλλο (π.χ. δεν του αρέσει το ψάρι)">
     <label>Χρώμα</label><input type="color" name="color" value="${esc(m.color || '#2f6f5e')}">`,
     async f => {
       const row = { name: f.get('name').trim(), relation: nul(f.get('relation')), sex: nul(f.get('sex')), birth_date: nul(f.get('birth_date')),
@@ -164,7 +219,24 @@ function editMember(m = {}) {
       if (m.id) await q(sb.from('members').update(row).eq('id', m.id));
       else { const [n] = await q(sb.from('members').insert(row).select()); S.mid = n.id; localStorage.setItem('mid', n.id); }
       await loadMembers(); route(); toast('Αποθηκεύτηκε');
-    }, { del: m.id ? async () => { await q(sb.from('members').delete().eq('id', m.id)); S.mid = null; await loadMembers(); route(); } : null });
+    }, {
+      del: m.id ? async () => { await q(sb.from('members').delete().eq('id', m.id)); S.mid = null; await loadMembers(); route(); } : null,
+      after: f => {
+        const bd = $('[name=birth_date]', f), sx = $('[name=sex]', f), hint = $('[data-agehint]', f);
+        const LABEL = { child: 'παιδιά έως 12', teen: 'εφήβους 13–17', adult: 'ενήλικες 18–39', middle: 'ηλικίες 40–64', senior: 'ηλικίες 65+' };
+        const condOpts = () => {
+          const g = ageGroup(bd.value);
+          hint.textContent = g ? `Συχνά θέματα για ${LABEL[g]}. Πάτα όσα ισχύουν.` : 'Βάλε ημερομηνία γέννησης για λίστα ανάλογη της ηλικίας.';
+          const list = g ? CONDITIONS[g] : [...new Set(Object.values(CONDITIONS).flat())];
+          return list.filter(c => !ONLY_SEX[c] || !sx.value || ONLY_SEX[c] === sx.value);
+        };
+        const dietOpts = () => ageGroup(bd.value) === 'child' ? [...DIETS_CHILD, ...DIETS.filter(d => !['Vegan', 'Χαμηλή σε υδατάνθρακες'].includes(d))] : DIETS;
+        const redrawC = picker(f, 'chronic_conditions', condOpts, m.chronic_conditions);
+        const redrawD = picker(f, 'diet_notes', dietOpts, m.diet_notes);
+        bd.addEventListener('change', () => { redrawC(); redrawD(); });
+        sx.addEventListener('change', redrawC);
+      }
+    });
 }
 
 /* ---------- δρομολόγηση ---------- */

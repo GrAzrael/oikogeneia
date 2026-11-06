@@ -1,5 +1,5 @@
 // Απλός service worker: κρατά το «κέλυφος» της εφαρμογής offline. Τα δεδομένα έρχονται πάντα ζωντανά.
-const C = 'oikogeneia-v3';
+const C = 'oikogeneia-v4';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'config.js', 'manifest.json', 'icon.svg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k))))); self.clients.claim(); });
