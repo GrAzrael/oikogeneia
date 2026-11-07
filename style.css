@@ -172,3 +172,7 @@ details.more summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--g
 .members,.fcats{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent);padding-right:32px}
 .fcats{scrollbar-width:none}.fcats::-webkit-scrollbar{display:none}
 .mlabel{flex-direction:column;align-items:flex-start;gap:1px}
+
+.pendbar{display:flex;align-items:center;gap:12px;background:var(--amber-soft);border-color:transparent;border-radius:12px;padding:12px}
+.pendbar .btn{flex:0 0 auto}
+.pendbar{flex-wrap:wrap}.pendbar .grow{flex:1 1 170px}

@@ -1,5 +1,5 @@
 // Service worker: πάντα φρέσκια έκδοση από το δίκτυο (χωρίς HTTP cache). Το cache χρησιμοποιείται μόνο offline.
-const C = 'oikogeneia-v6';
+const C = 'oikogeneia-v7';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

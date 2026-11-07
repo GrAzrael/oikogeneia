@@ -26,7 +26,7 @@
     return t;
   }
   const itemsText = items => (items || []).map(it => { const f = food(it.id); if (!f) return ''; const q = Number(it.q) || 1;
-    return (q === 1 ? '' : (q === .5 ? '½ × ' : String(q).replace('.', ',') + ' × ')) + f.name + ' (' + f.portion + ')'; }).filter(Boolean).join(', ');
+    return (q === 1 ? '' : (q === .5 ? '½ × ' : String(q).replace('.', ',') + ' × ')) + f.name + ' · ' + f.portion; }).filter(Boolean).join(', ');
 
   function age(bd) { if (!bd) return null; const b = new Date(bd), n = new Date(); let a = n.getFullYear() - b.getFullYear(); if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) a--; return a; }
   const has = (txt, re) => re.test((txt || '').toLowerCase());
@@ -164,7 +164,6 @@
 
     // σημειώσεις για την ημέρα
     const notes = [];
-    if (T.unknown) notes.push(`${T.unknown} γεύμα(τα) δεν έχουν ακόμα θρεπτικά — πες στο Claude «ανάλυσε τα γεύματα» για ακριβή εικόνα.`);
     if (T.sat_fat_g > P.satfat) notes.push(`Κορεσμένα σήμερα ${fmt(T.sat_fat_g)} g (όριο ${P.satfat} g) — στο επόμενο αποφύγετε τυριά, αλλαντικά, τηγανητά.`);
     if (T.sodium_mg > P.sodium) notes.push(`Αλάτι σήμερα ≈${fmt(T.sodium_mg)} mg νάτριο (όριο ${fmt(P.sodium)}) — πιο ανάλατα μέχρι το βράδυ.`);
     if (T.added_sugar > P.sugar) notes.push(`Ζάχαρη από γλυκά/ροφήματα σήμερα ≈${fmt(T.added_sugar)} g (όριο ${P.sugar} g) — όχι άλλα γλυκά, χυμούς ή αναψυκτικά σήμερα.`);
@@ -185,5 +184,66 @@
     return { P, T, slot, budget: Math.round(budget), ideas: ideas.slice(0, 3), notes, scale };
   }
 
-  window.NUTRI = { food, itemsTotals, itemsText, profile, dayTotals, nextSlot, suggest, PUR };
+  /* ---------- ανάλυση ελεύθερου κειμένου: «2 φέτες ψωμί ολικής, φακές με φέτα, ένα freddo» → items ---------- */
+  const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ς/g, 'σ');
+  const STOP = new Set(['με', 'σε', 'και', 'απο', 'χωρισ', 'λιγο', 'λιγη', 'λιγα', 'ενα', 'μια', 'μιασ', 'ενασ', 'τμχ', 'μεριδα', 'πιατο', 'ποτηρι', 'κουπα', 'φετεσ', 'κομματι', 'κομματια', 'σπιτικο', 'σπιτικη', 'του', 'τησ', 'το', 'τα', 'η', 'ο', 'οι']);
+  const ALIAS = {
+    bw: 'ψωμι ψωμακι', bww: 'ψωμι ολικησ πολυσπορο σικαλησ', fesp1: 'freddo φρεντο εσπρεσο espresso', fesp0: 'freddo σκετο', greek1: 'καφε καφεσ ελληνικοσ',
+    frappe: 'φραπε frappe', fcap1: 'καπουτσινο cappuccino φρεντο', filter: 'γαλλικοσ φιλτρου', water: 'νερο', beer: 'μπυρα μπυρεσ', wine: 'κρασι κρασια',
+    tsipouro: 'τσιπουρο ουζο ρακι', cola: 'κοκα κολα cola πορτοκαλαδα λεμοναδα αναψυκτικο', zero: 'zero light', souvpita: 'σουβλακι πιτα', gyros: 'γυροσ γυρο',
+    kalam: 'καλαμακι καλαμακια σουβλακι σουβλακια', green: 'σαλατα μαρουλι', horiatiki: 'χωριατικη', yellow: 'τυρι τυρια γκουντα κασερι', feta: 'φετα',
+    egg: 'αυγο αυγα', omel: 'ομελετα', yog2: 'γιαουρτι', chbr: 'κοτοπουλο στηθοσ', chth: 'κοτοπουλο μπουτι', pasta: 'μακαρονια ζυμαρικα πενεσ σπαγγετι',
+    potboil: 'πατατεσ βραστεσ φουρνου πουρε', potfry: 'πατατεσ τηγανητεσ', rice: 'ρυζι πιλαφι', apple: 'μηλο μηλα', banana: 'μπανανα', orange: 'πορτοκαλι',
+    toast: 'τοστ', pizza: 'πιτσα', burger: 'μπεργκερ burger', choco: 'σοκολατα', cake: 'κεικ', biscuits: 'μπισκοτα μπισκοτο', oj: 'χυμοσ', milk15: 'γαλα',
+    salmon: 'σολομοσ', bream: 'τσιπουρα λαβρακι ψαρι', tyrop: 'τυροπιτα', spanp: 'σπανακοπιτα', koul: 'κουλουρι', biftek: 'μπιφτεκι μπιφτεκια', olives: 'ελιεσ',
+    honey: 'μελι', walnut: 'καρυδια', almond: 'αμυγδαλα', tea: 'τσαι', herbal: 'χαμομηλι τσαι βουνου', tzatziki: 'τζατζικι', icecream: 'παγωτο'
+  };
+  const QW = { 'μισο': 0.5, 'μιση': 0.5, '½': 0.5, 'ενα': 1, 'ενασ': 1, 'μια': 1, 'δυο': 2, 'δυο': 2, 'τρια': 3, 'τρεισ': 3, 'τεσσερα': 4, 'τεσσερισ': 4 };
+  const stem = w => w.slice(0, Math.max(4, Math.min(6, w.length - 1)));
+  let INDEX = null;
+  function index() {
+    if (INDEX) return INDEX;
+    INDEX = window.FOODS.map(r => {
+      const words = norm(r[1] + ' ' + (ALIAS[r[0]] || '')).replace(/\(.*?\)/g, ' ').split(/[^a-zα-ω0-9]+/).filter(w => w.length >= 3 && !STOP.has(w));
+      const nameWords = norm(r[1]).replace(/\(.*?\)/g, ' ').split(/[^a-zα-ω0-9]+/).filter(w => w.length >= 3 && !STOP.has(w));
+      return { id: r[0], stems: [...new Set(words.map(stem))], nameStems: [...new Set(nameWords.map(stem))] };
+    });
+    return INDEX;
+  }
+  function matchPart(part) {
+    const t = norm(part);
+    const tw = t.split(/[^a-zα-ω0-9½,.]+/).filter(Boolean);
+    let q = 1;
+    for (const w of tw) { if (QW[w] != null) { q = QW[w]; break; } const n = parseFloat(w.replace(',', '.')); if (!isNaN(n) && n > 0 && n < 20) { q = n; break; } }
+    const toks = tw.filter(w => w.length >= 3 && !STOP.has(w)).map(stem);
+    if (!toks.length) return null;
+    let best = null;
+    for (const f of index()) {
+      const hit = f.stems.filter(s => toks.some(k => k.startsWith(s) || s.startsWith(k))).length;
+      if (!hit) continue;
+      const nameHit = f.nameStems.filter(s => toks.some(k => k.startsWith(s) || s.startsWith(k))).length;
+      const aliasHit = (ALIAS[f.id] || '').split(' ').filter(Boolean).map(w => stem(norm(w))).some(a => toks.some(k => k === a)) ? 0.6 : 0;
+      const score = hit + nameHit / Math.max(1, f.nameStems.length) - (f.nameStems.length - nameHit) * 0.15 + aliasHit;
+      if (!best || score > best.score) best = { id: f.id, score, full: nameHit === f.nameStems.length };
+    }
+    return best ? { id: best.id, q, full: best.full, score: best.score } : null;
+  }
+  /* επιστρέφει { items, unmatched[] } */
+  function parseText(text) {
+    const parts = (text || '').split(/\s*(?:,|\+|;|\n|&|\s+και\s+)\s*/i).map(x => x.trim()).filter(x => x.length > 1);
+    const items = [], unmatched = [];
+    const add = m => { const ex = items.find(i => i.id === m.id); if (ex) ex.q += m.q; else items.push({ id: m.id, q: m.q }); };
+    parts.forEach(p => {
+      const whole = matchPart(p);
+      const subs = p.split(/\s+με\s+/i).filter(x => x.trim().length > 1);
+      const dish = whole && whole.full && / με /i.test(F[whole.id][1]);
+      if (subs.length > 1 && !dish) {
+        // «φακές με φέτα» → δύο τρόφιμα, εκτός αν υπάρχει ολόκληρο πιάτο με αυτό το όνομα («μακαρόνια με κιμά»)
+        subs.forEach(x => { const m = matchPart(x); if (m) add(m); else unmatched.push(x.trim()); });
+      } else if (whole) add(whole); else unmatched.push(p);
+    });
+    return { items, unmatched };
+  }
+
+  window.NUTRI = { food, itemsTotals, itemsText, profile, dayTotals, nextSlot, suggest, PUR, parseText };
 })();
