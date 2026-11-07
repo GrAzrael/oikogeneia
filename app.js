@@ -5,12 +5,12 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const sb = window.supabase.createClient(window.CFG.url, window.CFG.key);
 const BUCKET = 'health-docs';
-const APP_VERSION = '5';
+const APP_VERSION = '6';
 const S = { user: null, members: [], mid: localStorage.getItem('mid'), charts: [], seg: {} };
 
 /* ---------- σταθερές ---------- */
 const MOODS = ['', '😣', '🙁', '😐', '🙂', '😄'];
-const MEAL_TYPES = ['πρωινό', 'δεκατιανό', 'μεσημεριανό', 'απογευματινό', 'βραδινό', 'σνακ'];
+const MEAL_TYPES = ['πρωινό', 'δεκατιανό', 'μεσημεριανό', 'απογευματινό', 'βραδινό', 'σνακ', 'καφές / ρόφημα', 'ποτό'];
 const MEAS = {
   'βάρος': 'kg', 'πίεση': 'mmHg', 'σάκχαρο': 'mg/dL', 'σφυγμοί': 'bpm',
   'περίμετρος μέσης': 'cm', 'θερμοκρασία': '°C'
@@ -99,7 +99,8 @@ function sheet(title, body, onSubmit, opts = {}) {
   const del = f.querySelector('[data-act=del]');
   if (del) del.onclick = async () => { if (confirm('Σίγουρα διαγραφή;')) { try { await opts.del(); d.close(); } catch (e) { fail(e); } } };
   opts.after?.(f);
-  d.showModal();
+  if (!d.open) d.showModal();
+  f.scrollTop = 0;
 }
 const opt = (arr, sel) => arr.map(v => `<option ${v === sel ? 'selected' : ''}>${esc(v)}</option>`).join('');
 const memberOpts = sel => S.members.map(m => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
@@ -288,6 +289,8 @@ async function home(v) {
       <button class="qbtn" data-q="meas"><span class="ic">⚖️</span><span>Μέτρηση</span></button>
       <button class="qbtn" data-q="doc"><span class="ic">📄</span><span>Εξετάσεις</span></button>
     </div>
+    <h2>Τι να φάω μετά;</h2>
+    <div class="card" id="nutri"><p class="sub" style="margin:0">Υπολογισμός…</p></div>
     <h2>Φάρμακα σήμερα</h2>
     <div class="list">${medsToday(medsL, logs) || '<div class="empty">Δεν υπάρχουν ενεργά φάρμακα.</div>'}</div>
     ${flags.length ? `<h2>Τιμές εκτός ορίων</h2><div class="list">${flags.map(labCard).join('')}</div>` : ''}
@@ -301,6 +304,8 @@ async function home(v) {
   bindLabCards(v);
   $$('[data-appt]').forEach(c => c.onclick = () => editAppt(appts.find(a => a.id === c.dataset.appt)));
   $('#addAppt').onclick = () => editAppt();
+  try { const r = await dayData(m.id); const box = $('#nutri'); if (box) { box.innerHTML = nutriHTML(r); bindNutri(box, r, m.id, route); } }
+  catch (e) { const box = $('#nutri'); if (box) box.innerHTML = '<p class="sub" style="margin:0">Δεν φορτώθηκε η σύνοψη ημέρας.</p>'; console.error(e); }
 }
 function medsToday(list, logs) {
   return list.map(md => {
@@ -580,26 +585,149 @@ function measChart(meas) {
   $('#mch').innerHTML = kinds.map(k => `<button type="button" class="btn small ${k === kind ? '' : 'ghost'}" data-mk="${esc(k)}" style="margin:4px 4px 0 0">${esc(k)}</button>`).join('');
   $$('[data-mk]').forEach(b => b.onclick = () => { S.seg.mkind = b.dataset.mk; route(); });
 }
+/* ---------- γεύμα: επιλογή από λίστα τροφίμων/ποτών + ελεύθερη περιγραφή/φωτογραφία ---------- */
 function addMeal(x = {}) {
   const h = new Date().getHours();
-  const guess = h < 10 ? 'πρωινό' : h < 12 ? 'δεκατιανό' : h < 16 ? 'μεσημεριανό' : h < 19 ? 'απογευματινό' : 'βραδινό';
-  sheet(x.id ? 'Γεύμα' : 'Τι έφαγες;', `
-    <label>Φωτογραφία (προαιρετικά)</label><input type="file" name="photo" accept="image/*" capture="environment">
-    <label>Περιγραφή</label><textarea name="description" placeholder="π.χ. φακές, ψωμί ολικής, φέτα, σαλάτα">${esc(x.description)}</textarea>
+  const guess = h < 5 ? 'σνακ' : h < 10 ? 'πρωινό' : h < 12 ? 'δεκατιανό' : h < 16 ? 'μεσημεριανό' : h < 19 ? 'απογευματινό' : h < 23 ? 'βραδινό' : 'σνακ';
+  const items = (x.items || []).map(i => ({ id: i.id, q: Number(i.q) || 1 }));
+  const fromList = NUTRI.itemsText(items);
+  let extra = x.description || '';
+  if (fromList && extra.startsWith(fromList)) extra = extra.slice(fromList.length).replace(/^\s*\+\s*/, '');
+  sheet(x.id ? 'Γεύμα' : 'Τι έφαγες ή ήπιες;', `
+    <label for="fq">Διάλεξε από τη λίστα</label>
+    <input id="fq" type="search" placeholder="Αναζήτηση: φακές, freddo, μήλο…" autocomplete="off">
+    <div class="seg fcats" role="group" aria-label="Κατηγορίες"></div>
+    <div class="flist" aria-live="polite"></div>
+    <div class="picked"></div>
+    <div class="ftotal hint"></div>
+    <details class="more" ${extra || x.photo_path ? 'open' : ''}><summary>Κάτι που δεν είναι στη λίστα; Γράψ' το ή βγάλε φωτογραφία</summary>
+      <label>Φωτογραφία</label><input type="file" name="photo" accept="image/*" capture="environment">
+      <label>Περιγραφή</label><textarea name="description" placeholder="π.χ. σπιτικό κοτόπουλο με χυλοπίτες">${esc(extra)}</textarea>
+      <p class="hint">Ό,τι γράφεις ή φωτογραφίζεις εδώ το αναλύει το Claude όταν του πεις «ανάλυσε τα γεύματα».</p>
+    </details>
     <div class="two"><div><label>Γεύμα</label><select name="meal_type">${opt(MEAL_TYPES, x.meal_type || guess)}</select></div>
     <div><label>Για</label><select name="member_id">${memberOpts(x.member_id || S.mid)}</select></div></div>
-    <label>Πότε</label><input type="datetime-local" name="eaten_at" value="${localDT(x.eaten_at ? new Date(x.eaten_at) : new Date())}">
-    <p class="hint">Τα θρεπτικά (θερμίδες, υδατάνθρακες, λιπαρά, πουρίνες) τα υπολογίζει το Claude όταν του πεις «ανάλυσε τα γεύματα».</p>`,
+    <label>Πότε</label><input type="datetime-local" name="eaten_at" value="${localDT(x.eaten_at ? new Date(x.eaten_at) : new Date())}">`,
     async f => {
-      const file = f.get('photo');
-      const row = { description: nul(f.get('description')), meal_type: f.get('meal_type'), member_id: f.get('member_id'), eaten_at: new Date(f.get('eaten_at')).toISOString() };
-      if (file && file.size) { row.photo_path = await upload(file, 'meals'); row.analyzed = false; }
-      if (!row.description && !row.photo_path && !x.photo_path) throw new Error('Γράψε τι έφαγες ή βάλε φωτογραφία');
-      if (x.id) { if (row.description !== x.description) row.analyzed = false; await q(sb.from('meals').update(row).eq('id', x.id)); }
-      else await q(sb.from('meals').insert(row));
-      toast('Καταγράφηκε'); route();
-    }, { del: x.id ? async () => { if (x.photo_path) await sb.storage.from(BUCKET).remove([x.photo_path]); await q(sb.from('meals').delete().eq('id', x.id)); route(); } : null });
+      const file = f.get('photo'), desc = (f.get('description') || '').trim();
+      const row = { meal_type: f.get('meal_type'), member_id: f.get('member_id'), eaten_at: new Date(f.get('eaten_at')).toISOString() };
+      if (file && file.size) row.photo_path = await upload(file, 'meals');
+      if (!items.length && !desc && !row.photo_path && !x.photo_path) throw new Error('Διάλεξε κάτι από τη λίστα, γράψε τι έφαγες ή βάλε φωτογραφία');
+      const t = NUTRI.itemsTotals(items);
+      row.items = items.length ? items : null;
+      row.description = [NUTRI.itemsText(items), desc].filter(Boolean).join(' + ') || null;
+      Object.assign(row, items.length
+        ? { kcal: t.kcal, carbs_g: t.carbs_g, sugar_g: t.sugar_g, fiber_g: t.fiber_g, protein_g: t.protein_g, fat_g: t.fat_g, sat_fat_g: t.sat_fat_g,
+            sodium_mg: t.sodium_mg, caffeine_mg: t.caffeine_mg, alcohol_g: t.alcohol_g, water_ml: t.water_ml, purines: NUTRI.PUR[t.pur] }
+        : (x.items?.length ? { kcal: null, carbs_g: null, sugar_g: null, fiber_g: null, protein_g: null, fat_g: null, sat_fat_g: null, sodium_mg: null, caffeine_mg: null, alcohol_g: null, water_ml: null, purines: null } : {}));
+      const needsClaude = !!(desc || row.photo_path || (x.photo_path && !items.length));
+      if (!x.id || row.description !== x.description || row.photo_path) { row.analyzed = !needsClaude; if (needsClaude) row.advisor_note = null; }
+      if (x.id) await q(sb.from('meals').update(row).eq('id', x.id)); else await q(sb.from('meals').insert(row));
+      toast('Καταγράφηκε');
+      route();
+      if (!x.id) setTimeout(() => nextMealSheet(row.member_id), 0);
+    }, {
+      del: x.id ? async () => { if (x.photo_path) await sb.storage.from(BUCKET).remove([x.photo_path]); await q(sb.from('meals').delete().eq('id', x.id)); route(); } : null,
+      after: f => foodPicker(f, items, x.member_id || S.mid)
+    });
 }
+async function foodPicker(f, items, mid) {
+  const qEl = $('#fq', f), cats = $('.fcats', f), list = $('.flist', f), picked = $('.picked', f), tot = $('.ftotal', f);
+  let cat = 'freq', freq = [];
+  const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const qty = n => n === 0.5 ? '½' : String(n).replace('.', ',');
+  const drawCats = () => {
+    cats.innerHTML = [['freq', '⭐ Συχνά'], ...FOOD_CATS.map((c, i) => [String(i), c])]
+      .map(([k, l]) => `<button type="button" data-c="${k}" aria-pressed="${cat === k && !qEl.value}">${esc(l)}</button>`).join('');
+    $$('button', cats).forEach(b => b.onclick = () => { cat = b.dataset.c; qEl.value = ''; drawCats(); drawList(); });
+  };
+  const drawList = () => {
+    const term = norm(qEl.value.trim());
+    let rows = term ? FOODS.filter(r => norm(r[1]).includes(term))
+      : cat === 'freq' ? (freq.length ? freq.map(id => FOODS.find(r => r[0] === id)).filter(Boolean) : FOODS.filter(r => ['fesp0', 'greek0', 'water', 'bww', 'yog2', 'apple', 'egg', 'fakes', 'chbr', 'horiatiki'].includes(r[0])))
+      : FOODS.filter(r => String(r[2]) === cat);
+    list.innerHTML = rows.length ? rows.slice(0, 40).map(r => `<button type="button" class="frow" data-f="${r[0]}">
+        <span class="grow"><span class="title">${esc(r[1])}</span><span class="meta">${esc(r[3])} · ${r[4]} kcal</span></span>
+        <span class="plus" aria-hidden="true">＋</span></button>`).join('')
+      : '<div class="empty" style="padding:14px">Δεν βρέθηκε. Γράψ\' το στην περιγραφή πιο κάτω.</div>';
+    $$('[data-f]', list).forEach(b => b.onclick = () => {
+      const it = items.find(i => i.id === b.dataset.f); if (it) it.q += 1; else items.push({ id: b.dataset.f, q: 1 });
+      drawPicked(); b.classList.add('flash'); setTimeout(() => b.classList.remove('flash'), 250);
+    });
+  };
+  const drawPicked = () => {
+    picked.innerHTML = items.length ? `<div class="hint" style="margin:10px 0 6px;font-weight:700">Επιλεγμένα</div>` + items.map((it, i) => {
+      const fd = NUTRI.food(it.id); if (!fd) return '';
+      return `<div class="prow"><span class="grow"><span class="title">${esc(fd.name)}</span><span class="meta">${esc(fd.portion)}</span></span>
+        <span class="stepper"><button type="button" data-m="${i}" aria-label="Λιγότερο">−</button><b>${qty(it.q)}</b><button type="button" data-p="${i}" aria-label="Περισσότερο">+</button></span></div>`;
+    }).join('') : '';
+    $$('[data-m]', picked).forEach(b => b.onclick = () => { const it = items[b.dataset.m]; it.q -= 0.5; if (it.q <= 0) items.splice(b.dataset.m, 1); drawPicked(); });
+    $$('[data-p]', picked).forEach(b => b.onclick = () => { items[b.dataset.p].q += 0.5; drawPicked(); });
+    const t = NUTRI.itemsTotals(items);
+    tot.innerHTML = items.length ? `≈ <b>${fmtNum(Math.round(t.kcal))} kcal</b> · υδατάνθρακες ${fmtNum(Math.round(t.carbs_g))} g · κορεσμένα ${fmtNum(t.sat_fat_g)} g · φυτικές ίνες ${fmtNum(t.fiber_g)} g · νάτριο ${fmtNum(Math.round(t.sodium_mg))} mg${t.caffeine_mg ? ' · καφεΐνη ' + Math.round(t.caffeine_mg) + ' mg' : ''}${t.alcohol_g ? ' · αλκοόλ ' + fmtNum(t.alcohol_g) + ' g' : ''}` : '';
+  };
+  qEl.oninput = () => { drawCats(); drawList(); };
+  qEl.onkeydown = e => { if (e.key === 'Enter') e.preventDefault(); };
+  drawCats(); drawList(); drawPicked();
+  // συχνά: από τα γεύματα των τελευταίων 30 ημερών
+  try {
+    const rows = await q(sb.from('meals').select('items').eq('member_id', mid).not('items', 'is', null).gte('eaten_at', new Date(Date.now() - 30 * 864e5).toISOString()).limit(200));
+    const cnt = {}; rows.forEach(r => (r.items || []).forEach(i => cnt[i.id] = (cnt[i.id] || 0) + 1));
+    freq = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 14).map(e => e[0]);
+    if (cat === 'freq' && !qEl.value) drawList();
+  } catch (e) { /* χωρίς συχνά */ }
+}
+
+/* ---------- «Τι να φάω μετά;» ---------- */
+async function dayData(mid) {
+  const [meals, labs] = await Promise.all([
+    q(sb.from('meals').select('*').eq('member_id', mid).gte('eaten_at', startOfDay().toISOString()).order('eaten_at')),
+    q(sb.from('v_latest_results').select('test_name,flag').eq('member_id', mid))
+  ]);
+  return NUTRI.suggest(member(mid), meals, labs);
+}
+function meter(label, val, target, unit, kind) {
+  const pct = target ? Math.min(100, val / target * 100) : 0;
+  const cls = kind === 'limit' ? (val > target ? 'bad' : val > target * 0.85 ? 'warn' : 'ok') : (pct >= 90 ? 'ok' : 'low');
+  return `<div class="meter ${cls}"><div class="mlabel"><span>${label}</span><b>${fmtNum(Math.round(val))}<span class="unit">/${fmtNum(target)} ${unit}</span></b></div>
+    <div class="mbar"><i style="width:${pct.toFixed(0)}%"></i></div></div>`;
+}
+function nutriHTML(r) {
+  const { P, T } = r;
+  const meters = [meter('Θερμίδες', T.kcal, P.kcal, 'kcal', 'limit'), meter('Κορεσμένα', T.sat_fat_g, P.satfat, 'g', 'limit'),
+    meter('Νάτριο (αλάτι)', T.sodium_mg, P.sodium, 'mg', 'limit'), meter('Πρόσθετη ζάχαρη', T.added_sugar, P.sugar, 'g', 'limit'),
+    meter('Φυτικές ίνες', T.fiber_g, P.fiber, 'g', 'goal'), meter('Υγρά', T.water_ml, P.water, 'ml', 'goal')].join('');
+  return `<div class="meters">${meters}</div>
+    ${r.notes.length ? `<div class="notes">${r.notes.slice(0, 4).map(n => `<p>⚠︎ ${esc(n)}</p>`).join('')}</div>` : ''}
+    <div class="hint" style="margin:12px 0 6px;font-weight:700">Για ${esc(r.slot.label)}${r.scale < 1 ? ' (παιδική μερίδα)' : ''}:</div>
+    <div class="list">${r.ideas.length ? r.ideas.map((i, k) => `<div class="card idea">
+      <div class="title">${esc(i.name)}</div>
+      <div class="meta">≈ ${i.kcal} kcal · ίνες ${i.fiber} g · πρωτεΐνη ${i.protein} g · κορεσμένα ${fmtNum(i.sat)} g</div>
+      <ul>${i.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul>
+      <div class="actions" style="margin-top:8px"><button type="button" class="btn small" data-ate="${k}">✓ Το έφαγα</button></div></div>`).join('')
+      : '<div class="empty">Δεν βρέθηκε πρόταση που να ταιριάζει στις προτιμήσεις. Ρώτησε το Claude.</div>'}</div>
+    <p class="hint">Γενικές διατροφικές προτάσεις με βάση ό,τι έχεις καταγράψει σήμερα, τα θέματα υγείας και τις εξετάσεις. Δεν αντικαθιστούν γιατρό ή διαιτολόγο.</p>`;
+}
+function bindNutri(root, r, mid, done) {
+  $$('[data-ate]', root).forEach(b => b.onclick = async () => {
+    const i = r.ideas[b.dataset.ate]; b.disabled = true;
+    try {
+      const raw = i.raw, sc = i.scale, n = k => Math.round(raw[k] * sc * 10) / 10;
+      const SLOT2TYPE = { b: 'πρωινό', s: new Date().getHours() < 12 ? 'δεκατιανό' : 'απογευματινό', l: 'μεσημεριανό', d: 'βραδινό', late: 'σνακ' };
+      await q(sb.from('meals').insert({ member_id: mid, meal_type: SLOT2TYPE[r.slot.k], description: i.name + (sc < 1 ? ' (παιδική μερίδα)' : ''),
+        analyzed: true, kcal: n(3), carbs_g: n(4), sugar_g: n(5), fiber_g: n(6), protein_g: n(7), fat_g: n(8), sat_fat_g: n(9), sodium_mg: n(10),
+        purines: NUTRI.PUR[raw[11]], advisor_note: i.why[0] }));
+      toast('Καταγράφηκε'); done?.();
+    } catch (e) { fail(e); b.disabled = false; }
+  });
+}
+async function nextMealSheet(mid) {
+  try {
+    const r = await dayData(mid);
+    sheet('Τι να φάω μετά;', nutriHTML(r), null, { after: f => bindNutri(f, r, mid, () => { $('#sheet').close(); route(); }) });
+  } catch (e) { fail(e); }
+}
+
 const scale = (name, val, icons) => `<div class="scale">${[1, 2, 3, 4, 5].map(i =>
   `<label><input type="radio" name="${name}" value="${i}" ${+val === i ? 'checked' : ''}><span>${icons ? icons[i] : i}</span></label>`).join('')}</div>`;
 function addMood(x = {}) {

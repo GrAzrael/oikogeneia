@@ -135,3 +135,40 @@ dialog h3:focus{outline:none}
   min-height:36px;text-align:left;max-width:100%;overflow-wrap:anywhere;line-height:1.25}
 .opt[aria-pressed=true]{background:var(--green-soft);border-color:var(--green-2);color:var(--green)}
 .opt[aria-pressed=true]::before{content:'✓ ';font-weight:800}
+
+/* επιλογή τροφίμων */
+.fcats{margin:8px 0 6px}
+.flist{max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.frow{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;padding:10px 12px;text-align:left;cursor:pointer;min-height:48px}
+.frow:last-child{border-bottom:0}
+.frow .title{display:block;font-weight:700;font-size:15px}
+.frow .meta{display:block}
+.frow .plus{flex:0 0 auto;width:32px;height:32px;border-radius:50%;background:var(--green-soft);color:var(--green);display:grid;place-items:center;font-weight:800}
+.frow.flash{background:var(--green-soft)}
+.prow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.prow .title{display:block;font-weight:700;font-size:15px;overflow-wrap:anywhere}
+.prow .meta{display:block}
+.stepper{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.stepper button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);font-size:18px;font-weight:700;cursor:pointer}
+.stepper b{min-width:26px;text-align:center}
+.ftotal{margin-top:8px;line-height:1.5}
+details.more{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
+details.more summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--green-2)}
+/* σύνοψη ημέρας */
+.meters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+@media (min-width:640px){.meters{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.meter{min-width:0}
+.mlabel{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:12.5px;color:var(--muted);font-weight:700;flex-wrap:wrap}
+.mlabel b{color:var(--ink);font-size:14px;white-space:nowrap}
+.mbar{height:7px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:4px}
+.mbar i{display:block;height:100%;border-radius:9px;background:var(--green-2)}
+.meter.warn .mbar i{background:var(--amber)} .meter.bad .mbar i{background:var(--red)} .meter.low .mbar i{background:var(--blue)}
+.meter.bad .mlabel b{color:var(--red)}
+.notes{margin-top:12px;background:var(--amber-soft);border-radius:12px;padding:8px 12px}
+.notes p{margin:4px 0;font-size:13.5px;color:var(--ink);overflow-wrap:anywhere}
+.idea ul{margin:6px 0 0;padding-left:18px;color:var(--green-2);font-size:13.5px}
+.idea li{overflow-wrap:anywhere}
+/* οριζόντιες λίστες που κυλάνε: σβήσιμο στη δεξιά άκρη ώστε να φαίνεται ότι συνεχίζουν */
+.members,.fcats{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent);padding-right:32px}
+.fcats{scrollbar-width:none}.fcats::-webkit-scrollbar{display:none}
+.mlabel{flex-direction:column;align-items:flex-start;gap:1px}
